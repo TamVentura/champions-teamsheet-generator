@@ -311,6 +311,10 @@ function hasFlag(slot: number, field: string): FieldFlag | undefined {
   return state.flags.find((f) => f.slot === slot && f.field === field);
 }
 
+function flagByReason(slot: number, reason: FieldFlag['reason']): FieldFlag | undefined {
+  return state.flags.find((f) => f.slot === slot && f.reason === reason);
+}
+
 // ---------------- Navigation (History API) ----------------
 
 /** Move forward to a new view, adding a history entry so the Back button returns here. */
@@ -818,7 +822,10 @@ function renderMonCard(mon: ChampionsMon, slot: number): HTMLElement {
       <span class="muted">EV total: <b id="evtotal" style="color:${v.ok ? 'var(--ok)' : 'var(--error)'}">${v.total}</b>/66</span>
     </div>
     <div class="grid2">
-      <div><label>Species ${flagBadge(slot, 'species')}</label><input list="dl-species" data-f="species"${flagClass(slot, 'species')} value="${esc(mon.species)}"></div>
+      <div><label>Species ${flagBadge(slot, 'species')}${flagByReason(slot, 'name-mismatch') ? '<span class="mismatch-badge" title="OCR name differs from the inferred species — please confirm" style="color:var(--warn);cursor:default">⚠ name?</span>' : ''}</label>
+        <input list="dl-species" data-f="species"${flagClass(slot, 'species')} value="${esc(mon.species)}">
+        <div class="species-candidates" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+      </div>
       <div><label>Gender</label><select data-f="gender">
         <option value=""${mon.gender === null ? ' selected' : ''}>—</option>
         <option value="M"${mon.gender === 'M' ? ' selected' : ''}>♂ Male</option>
@@ -889,6 +896,25 @@ function renderMonCard(mon: ChampionsMon, slot: number): HTMLElement {
   });
   card.appendChild(compareBtn);
   }
+
+  const ambiguous = flagByReason(slot, 'ambiguous-species');
+  const candWrap = card.querySelector<HTMLElement>('.species-candidates');
+  const speciesInput = card.querySelector<HTMLInputElement>('input[data-f="species"]');
+  if (ambiguous && ambiguous.candidates && candWrap && speciesInput) {
+    for (const cand of ambiguous.candidates) {
+      const isName = cand === mon.species; // pre-highlight the current pick (the inferred top species)
+      const chip = el(
+        `<button type="button" class="chip" style="padding:3px 8px;font-size:0.8rem;border-radius:12px;border:1px solid var(--border);background:${isName ? 'var(--panel-2)' : 'transparent'};color:var(--text);cursor:pointer">${esc(cand)}</button>`
+      );
+      chip.addEventListener('click', () => {
+        mon.species = cand;
+        speciesInput.value = cand;
+        speciesInput.dispatchEvent(new CustomEvent('review:revalidate', { bubbles: true }));
+      });
+      candWrap.appendChild(chip);
+    }
+  }
+
   return card;
 }
 

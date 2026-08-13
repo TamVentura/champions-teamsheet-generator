@@ -18,6 +18,7 @@ import {
 } from './card';
 import { inferTeam, InferenceSignals, InferenceResult } from '../domain/speciesInference';
 import { isBaseForme } from '../domain/formes';
+import { readTypeIcons } from './typeIcons';
 
 // Champions displays base species names, never the alternate-forme suffixes the vocab also
 // contains. Matching a base name against those forms lets OCR junk snap to e.g. "Kangaskhan-Mega",
@@ -168,6 +169,14 @@ async function readBand(moves: Screen, frac: Rect, list: string[], thresholds: n
 // brighter (often JPG-blurred) name/move text so at least a few land in each field's sweet spot.
 const FIELD_T = [150, 165, 180, 195, 210];
 
+// Card-header type icons sit at the right end of the LEFT column, just before the column gap:
+// [name] [gender ♂/♀] [type1] [type2]. This is the icon-zone width (card fractions) taken back
+// from the column gap. Cropping here — rather than "everything right of the name" — keeps the read
+// out of the right-hand moves column and lets the reader see the icon squares. readTypeIcons stays
+// deliberately conservative (returns confident:false) when it can't cleanly isolate genuine type
+// icons, so the gender glyph is never confidently misread into the hard type filter.
+const ICON_ZONE_W = 0.19;
+
 /**
  * Resolve species for every slot from its inference signals, then derive the per-slot species flags.
  * Runs inference sequentially (Species Clause), so slots must be passed in slot order. `names` are
@@ -225,6 +234,7 @@ export async function extractTeam(
     spread: ReturnType<typeof validateSpread>;
     finalStats: Record<StatKey, number | null>;
     evDigits: Record<StatKey, number | null>;
+    types: { types: string[]; confident: boolean };
   }
   const raws: CardRaw[] = new Array(total);
 
@@ -258,6 +268,20 @@ export async function extractTeam(
     }
 
     const gender = detectGender(moves.pixels(within(movesCard, mv.name)));
+
+    // Deterministic type-icon read from the header icon zone (right end of the left column). Gated
+    // on `confident` downstream, so an unsure read leaves the type filter skipped (graceful).
+    const typeStrip: Rect = {
+      x: Math.max(0, movesGrid.gap - ICON_ZONE_W),
+      y: mv.name.y,
+      w: Math.min(movesGrid.gap, ICON_ZONE_W),
+      h: mv.name.h,
+    };
+    const typeRead =
+      typeStrip.w > 0.02
+        ? readTypeIcons(moves.pixels(within(movesCard, typeStrip)))
+        : { types: [] as string[], confident: false };
+
     const evs: EvSpread = st.evs;
     const lowConf: StatKey[] = STAT_KEYS.filter((_, i) => !st.evConfident[i]);
     const spread = validateSpread(evs);
@@ -275,6 +299,7 @@ export async function extractTeam(
       spread,
       finalStats: st.finalStats,
       evDigits: st.evDigits,
+      types: typeRead,
     };
     onProgress?.(++done, total);
   }
@@ -292,7 +317,7 @@ export async function extractTeam(
   // Second pass: resolve species across the whole team (Species Clause) and derive species flags.
   const signals = raws.map((r) => ({
     ability: r.ability.value ? { value: r.ability.value, confident: r.ability.confident } : null,
-    types: null as { value: string[]; confident: boolean } | null, // populated by Task 6
+    types: r.types.confident ? { value: r.types.types, confident: true } : null,
     finalStats: r.finalStats,
     evDigits: r.evDigits,
     nature: r.nature,

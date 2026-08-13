@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "vendor:ocr": "node scripts/vendor-ocr.mjs",
-    "build": "npm run vendor:ocr && tsc --noEmit && vite build",
+    "gen:precache": "node scripts/gen-precache.mjs",
+    "build": "npm run vendor:ocr && tsc --noEmit && vite build && npm run gen:precache",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

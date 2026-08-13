@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#5b3fa6" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <!-- iOS Safari "Add to Home Screen": run standalone and use an opaque touch icon (iOS does
+         not mask or honour transparency). Combined with the service worker's full precache, the
+         home-screen app works offline after its first online launch. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Teamsheet" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <title>Champions Teamsheet Generator</title>
   </head>
   <body>
