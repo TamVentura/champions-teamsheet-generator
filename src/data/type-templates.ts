@@ -29,8 +29,30 @@ export const GLYPH_TEMPLATES: GlyphTemplate[] = [
   { kind: 'gender', name: 'M', rows: [0,0,0,0,0,0,522240,520192,491520,507904,517632,409472,399584,143456,12400,12400,12384,6624,8128,3968,0,0,0,0] },
   { kind: 'type', name: 'Steel', rows: [0,0,0,0,0,262016,131008,16064,135104,509920,421856,421856,1034224,1034352,1040256,499648,106368,16128,15360,6144,0,0,0,0] },
   { kind: 'type', name: 'Dragon', rows: [0,0,256,25344,25344,32512,65280,130944,130944,3735430,3735326,3964702,3964702,3948094,3997628,1900348,1867544,15872,15872,15872,15360,0,0,0] },
+  // Types below were mined from MOVE-row icons (same rounded-square badge design as header icons),
+  // labelled via src/data/move-types.ts — see this file's header note. Each is the medoid glyph of
+  // its type's confidently-read move icons across the sample screenshots, extracted through the
+  // reader's exact segmentation/Otsu pipeline (typeIcons.extractBadgeGlyphs), so it matches what the
+  // reader pulls from a header badge. Both were cross-validated on all sample HEADERS: adding them
+  // left EVERY already-covered header read unchanged (zero regression) and produced no confident
+  // wrong/gender read. Psychic (distinct hexagon, 24 move samples) and Ice (snowflake) were the two
+  // types whose medoid stayed far enough from every existing template to clear the reader's margin
+  // gate without eroding a neighbour. Rock/Fighting/Bug were mined too but DROPPED: their glyphs sit
+  // ~0.64-0.69 IoU from Steel/Fairy/Ghost, which pushed those covered reads below the confidence
+  // margin (and would themselves abstain against Steel/Fairy anyway) — a net loss, so correctness
+  // won over coverage. Electric/Poison could not be built at all (their bright/panel-coloured badge
+  // background makes the shared Otsu split degrade the glyph to a blob).
+  { kind: 'type', name: 'Psychic', rows: [0,0,0,0,7168,15360,65280,518112,517088,458848,458848,458848,458848,458848,458848,517088,518112,130944,15360,7168,0,0,0,0] },
+  { kind: 'type', name: 'Ice', rows: [0,0,0,0,6144,7168,200896,245472,524256,261088,65408,65408,65408,65408,130944,262112,261856,212192,7168,7168,2048,0,0,0] },
 ];
 
-// 10 of 18 types covered by committed templates: Dark, Dragon, Fairy, Fire, Flying, Ghost, Grass, Ground, Steel, Water.
-// Missing (reader abstains rather than guess): Normal, Electric, Ice, Fighting, Poison, Psychic, Bug, Rock.
-export const COVERED_TYPES: ReadonlySet<string> = new Set(['Dark', 'Dragon', 'Fairy', 'Fire', 'Flying', 'Ghost', 'Grass', 'Ground', 'Steel', 'Water']);
+// 12 of 18 types covered by committed templates. Original 10 (header-derived): Dark, Dragon, Fairy,
+// Fire, Flying, Ghost, Grass, Ground, Steel, Water. Added from move-row icons: Psychic, Ice.
+// Still missing (reader abstains rather than guess):
+//   - Normal: only ever a grey status shield in the samples, never a coloured type glyph.
+//   - Electric, Poison: move icons have a bright / panel-coloured badge background that the shared
+//     Otsu segmentation can't split from the white glyph, so the mask degrades to a blob.
+//   - Rock, Fighting, Bug: clean glyphs were mined, but each sits too close (IoU ~0.64-0.69) to
+//     Steel / Fairy / Ghost to add without eroding those covered reads below the confidence margin,
+//     so they were dropped (correctness over coverage). See GLYPH_TEMPLATES note above.
+export const COVERED_TYPES: ReadonlySet<string> = new Set(['Dark', 'Dragon', 'Fairy', 'Fire', 'Flying', 'Ghost', 'Grass', 'Ground', 'Steel', 'Water', 'Psychic', 'Ice']);

@@ -48,6 +48,23 @@ const vocab = {
   natures: uniqSorted(Object.keys(natures)),
 };
 
+// Move -> type table, from the full Showdown movedex (vendor-src/moves-full.js,
+// `exports.BattleMovedex`). Keyed by the SAME display names as vocab.moves so the type-icon
+// reader (which mines glyph templates from move-row icons labelled by the move's type) can look
+// a move's type up by the name the OCR pipeline snaps to.
+const movedex = evalVarObject('moves-full.js');
+const showdownMoveType = {};
+for (const entry of Object.values(movedex)) {
+  if (entry && typeof entry.name === 'string' && typeof entry.type === 'string') {
+    showdownMoveType[entry.name] = entry.type;
+  }
+}
+const moveTypes = {};
+for (const name of vocab.moves) {
+  const t = showdownMoveType[name];
+  if (typeof t === 'string') moveTypes[name] = t;
+}
+
 const fullPokedex = evalVarObject('pokedex-full.js');
 const speciesTypes = {};
 const speciesAbilities = {};
@@ -113,7 +130,16 @@ writeFileSync(
     ';\n'
 );
 
+writeFileSync(
+  join(outDir, 'move-types.ts'),
+  header +
+    'export const moveTypes: Record<string, string> = ' +
+    JSON.stringify(sortKeys(moveTypes), null, 2) +
+    ';\n'
+);
+
 console.log('vendored:', {
+  moveTypes: Object.keys(moveTypes).length,
   species: vocab.species.length,
   moves: vocab.moves.length,
   items: vocab.items.length,

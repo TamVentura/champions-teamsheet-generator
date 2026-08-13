@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readTypeIcons } from '../../src/ocr/typeIcons';
+import { readTypeIcons, extractBadgeGlyphs } from '../../src/ocr/typeIcons';
 import { RegionData } from '../../src/ocr/pixels';
 import { GLYPH_N, GLYPH_TEMPLATES } from '../../src/data/type-templates';
 import { detectPanels, panelToCardBox } from '../../src/ocr/panels';
@@ -111,6 +111,19 @@ describe('readTypeIcons (template matcher, rendered strips)', () => {
     const b = readTypeIcons(renderStrip(['M', 'Fire', 'Flying']));
     expect(a).toEqual(b);
   });
+
+  // The move-icon-derived templates must round-trip through the reader like the header-derived ones.
+  it('reads the move-derived Psychic template as [Psychic]', () => {
+    const res = readTypeIcons(renderStrip(['F', 'Psychic']));
+    expect(res.confident).toBe(true);
+    expect(res.types).toEqual(['Psychic']);
+  });
+
+  it('reads the move-derived Ice template as [Ice]', () => {
+    const res = readTypeIcons(renderStrip(['M', 'Ice']));
+    expect(res.confident).toBe(true);
+    expect(res.types).toEqual(['Ice']);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -136,8 +149,49 @@ const CARDS: Array<{ name: string; gender: 'M' | 'F'; truth: string[] }> = [
   { name: 'Archaludon', gender: 'M', truth: ['Steel', 'Dragon'] },
 ];
 
+// Best IoU (±1px shift) of a glyph mask against a committed template — same metric the reader uses.
+function popcount(n: number): number {
+  n = n - ((n >>> 1) & 0x55555555);
+  n = (n & 0x33333333) + ((n >>> 2) & 0x33333333);
+  return (((n + (n >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+}
+function bestIou(a: number[], b: number[]): number {
+  let best = 0;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      let inter = 0, uni = 0;
+      for (let y = 0; y < GLYPH_N; y++) {
+        const ay = a[y];
+        const by = y + dy;
+        let brow = by >= 0 && by < GLYPH_N ? b[by] : 0;
+        brow = dx >= 0 ? (brow << dx) >>> 0 : brow >>> -dx;
+        brow &= (1 << GLYPH_N) - 1;
+        uni += popcount((ay | brow) >>> 0);
+        inter += popcount((ay & brow) >>> 0);
+      }
+      const s = uni ? inter / uni : 0;
+      if (s > best) best = s;
+    }
+  return best;
+}
+function bestTemplateName(rows: number[]): string {
+  let best = { name: '', score: -1 };
+  for (const t of GLYPH_TEMPLATES) {
+    const s = bestIou(rows, t.rows);
+    if (s > best.score) best = { name: t.name, score: s };
+  }
+  return best.name;
+}
+
 describe.skipIf(!HAS_SAMPLE)('readTypeIcons (real image — sample/zard-moves.png)', () => {
   let reads: Array<{ types: string[]; confident: boolean }> | null = null;
+  // MOVE-row icons extracted through the reader's own segmentation, then classified against the
+  // committed templates — proving move-row icons are the SAME glyph the reader matches from headers.
+  // Tailwind (Flying) exercises a HEADER-derived template; Reflect (Psychic) exercises a MOVE-derived
+  // one. (Individual Fire move icons like Heat Wave are too small/blurred to classify on their own —
+  // only the aggregate medoid is reliable — so a clean, high-ink example of each is used here.)
+  let moveFlyingName: string | null = null; // Whimsicott's Tailwind, slot 3 move 3
+  let movePsychicName: string | null = null; // Goldblina's Reflect, slot 2 move 3
 
   beforeAll(async () => {
     let loadImage: (src: Buffer) => Promise<{ width: number; height: number }>;
@@ -187,6 +241,36 @@ describe.skipIf(!HAS_SAMPLE)('readTypeIcons (real image — sample/zard-moves.pn
       };
       return readTypeIcons(pixels(within(card, strip)));
     });
+
+    // Classify a move-row icon: crop the icon zone (column gap → move-text left edge) and match the
+    // dominant extracted glyph against the committed templates.
+    const moveIconName = (slot: number, moveIdx: number): string | null => {
+      const mvc = analyzeMovesCard(cardRegs[slot], grid);
+      const m = mvc.moves[moveIdx];
+      const zoneW = m.x - grid.gap;
+      const iconZone = { x: grid.gap, y: m.y, w: zoneW * 1.2, h: m.h };
+      const glyphs = extractBadgeGlyphs(pixels(within(cardBoxes[slot], iconZone)));
+      let dom: { rows: number[]; box: { x0: number; y0: number; x1: number; y1: number } } | null = null;
+      for (const g of glyphs) {
+        const area = (g.box.x1 - g.box.x0 + 1) * (g.box.y1 - g.box.y0 + 1);
+        if (!dom || area > (dom.box.x1 - dom.box.x0 + 1) * (dom.box.y1 - dom.box.y0 + 1)) dom = g;
+      }
+      return dom ? bestTemplateName(dom.rows) : null;
+    };
+    moveFlyingName = moveIconName(3, 2);
+    movePsychicName = moveIconName(2, 2);
+  });
+
+  it('a Flying MOVE-row icon matches the header-derived Flying template', () => {
+    // The two icon sources (header badges, move-row badges) are the same glyph, so move-mined
+    // templates are valid for reading headers.
+    expect(moveFlyingName, 'Tailwind (Flying move) icon should classify as Flying').toBe('Flying');
+  });
+
+  it('a Psychic MOVE-row icon matches the move-derived Psychic template', () => {
+    // Closes the loop: a move icon of a newly-covered type is read by the template mined from move
+    // icons of that same type.
+    expect(movePsychicName, 'Reflect (Psychic move) icon should classify as Psychic').toBe('Psychic');
   });
 
   it('locates all six cards from the sample', () => {

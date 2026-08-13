@@ -328,6 +328,39 @@ function matchBadge(rows: number[]): BadgeMatch & { confident: boolean } {
   return { name: best.name, kind: best.kind, score: best.score, margin, confident: best.score >= MIN_IOU && margin >= MARGIN };
 }
 
+export interface BadgeGlyph {
+  /** GLYPH_N-row packed white-glyph mask (same encoding as GLYPH_TEMPLATES.rows). */
+  rows: number[];
+  /** Foreground pixel count of the extracted glyph. */
+  fg: number;
+  /** Badge bounding box in the strip (left-to-right order). */
+  box: Box;
+}
+
+/**
+ * Extract every badge's normalized 24×24 white-glyph mask from a strip, using the EXACT
+ * segmentation + Otsu-normalization the reader runs at match time (badgeBand → panelColor →
+ * badgeMask → close → components → badgeBoxes → glyphRows). Exposed so offline template-building
+ * can mine the MOVE-row type icons (identical rounded-square badge design as the header icons)
+ * through the identical pipeline — guaranteeing a move-derived mask is directly comparable to what
+ * the reader extracts from a header badge. Not used by readTypeIcons itself (the reader is
+ * unchanged); this is a read-only view onto the same primitives.
+ */
+export function extractBadgeGlyphs(reg: RegionData): BadgeGlyph[] {
+  const { width, height } = reg;
+  if (width < 8 || height < 8) return [];
+  const band = badgeBand(reg);
+  if (band.y1 - band.y0 + 1 < height * 0.4) return [];
+  const panel = panelColor(reg, band.y0, band.y1);
+  const mask = badgeMask(reg, band, panel);
+  const closed = close(mask, width, height, 1);
+  const boxes = badgeBoxes(components(closed, width, height), height);
+  return boxes.map((box) => {
+    const { rows, fg } = glyphRows(reg, box);
+    return { rows, fg, box };
+  });
+}
+
 /**
  * Read the 1-2 Pokémon type(s) from a card-header icon strip via deterministic template matching.
  * Returns confident:true ONLY when every detected badge is confidently a gender or a covered type,
