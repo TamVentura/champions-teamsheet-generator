@@ -1,0 +1,143 @@
+:root {
+  --bg: #0e0a1e;
+  --panel: #1c1533;
+  --panel-2: #241a44;
+  --accent: #7c5cff;
+  --accent-2: #33d0c0;
+  --text: #ece8ff;
+  --muted: #a99fce;
+  --warn: #ffcc00;
+  --warn-bg: #4a3a00;
+  --error: #ff5470;
+  --error-bg: #4a1020;
+  --ok: #46d17a;
+  --border: #362a5e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Extra bottom room so the trailing button (e.g. About's "← Back") clears the gesture bar.
+   MainActivity already pads the WebView by the nav-bar inset, so env() is 0 there and the 40px
+   applies; in a plain browser PWA env() adds the real inset on top. */
+#app { max-width: 1100px; margin: 0 auto; padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 40px); }
+
+h1 { font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
+h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Inline SVG button icon: a 1em flex child, so align-items:center centres it exactly. */
+.ico { width: 1em; height: 1em; flex: 0 0 auto; display: inline-block; }
+
+label { display: block; font-size: 0.85rem; color: var(--muted); margin: 8px 0 2px; }
+input, select {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 12px 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+
+button.danger { background: var(--error); color: white; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 420px;
+  width: 100%;
+}
+.modal h3 { margin: 0 0 8px; font-size: 1.1rem; }
+.modal p { margin: 0 0 16px; color: var(--muted); }
+.modal-actions { justify-content: flex-end; }
+
+a { color: var(--accent-2); }
+
+.app-footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; justify-content: center; }
+button.linkbtn {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 6px 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Segmented control (input-mode radio-group): joined buttons, one active, no inner borders. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.segmented [role="radio"] {
+  background: var(--panel-2);
+  color: var(--muted);
+  border: 0;
+  border-radius: 0;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none;
+}
+.segmented [role="radio"] + [role="radio"] { border-left: 1px solid var(--border); }
+.segmented [role="radio"][aria-checked="true"] { background: var(--accent); color: #fff; }
+.segmented [role="radio"]:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+
+/* Review: single column on mobile, two side-by-side cards on wide screens. */
+.mon-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.mon-grid .panel { margin: 0; }
+@media (min-width: 900px) { .mon-grid { grid-template-columns: 1fr 1fr; } }
+
+button.secondary:hover { border-color: var(--accent); }
+
+@media (max-width: 640px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .segmented { display: flex; width: 100%; }
+  .segmented [role="radio"] { flex: 1; padding: 10px 8px; }
+}

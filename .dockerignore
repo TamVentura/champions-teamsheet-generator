@@ -1,0 +1,7 @@
+node_modules
+.git
+tools/out
+vendor-src
+sample
+docs
+*.log

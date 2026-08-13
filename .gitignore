@@ -1,0 +1,34 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+tools/out/
+
+# Claude Code / superpowers working files — never publish to the repo.
+.claude/
+.claude-dev-helper/
+.superpowers/
+docs/superpowers/
+
+# Private data — never publish. Generated team sheets and the real-team OCR
+# fixtures both contain player PII (name, DOB, player id). gen-tiago.mts hardcodes
+# a personal profile. Kept on disk for local dev, out of the public repo.
+out/
+sample/
+tools/gen-tiago.mts
+
+# Generated OCR engine assets (produced by scripts/vendor-ocr.mjs on build).
+# The Capacitor android/ project is committed, but its copy of the web assets
+# (android/app/src/main/assets/public/) is git-ignored by Capacitor's own android/.gitignore,
+# so the engine lives in git only as node_modules + eng.traineddata and is regenerated on build.
+public/tesseract/
+
+# Signing material must never be committed.
+*.keystore
+*.jks
+android/keystore.properties
+
+# Build artifacts (release outputs are produced on demand).
+*.apk
+*.aab
+*.apks

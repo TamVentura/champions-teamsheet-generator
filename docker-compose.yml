@@ -1,0 +1,7 @@
+services:
+  web:
+    build: .
+    image: champions-teamsheet:local
+    ports:
+      - "3620:80"
+    restart: unless-stopped

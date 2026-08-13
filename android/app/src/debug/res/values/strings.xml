@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Debug (side-by-side) build: distinct label so it's easy to tell apart from the store app. -->
+    <string name="app_name">Teamsheet Dev</string>
+    <string name="title_activity_main">Teamsheet Dev</string>
+</resources>

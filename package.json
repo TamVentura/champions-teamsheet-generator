@@ -1,0 +1,42 @@
+{
+  "name": "champions-teamsheet-generator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "vendor:ocr": "node scripts/vendor-ocr.mjs",
+    "build": "npm run vendor:ocr && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "vendor": "node scripts/vendor-data.mjs",
+    "cap:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/filesystem": "^7.1.8",
+    "@capacitor/share": "^7.0.4",
+    "jspdf": "^2.5.2",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.6.8",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.6.8",
+    "@capacitor/core": "^7.6.8",
+    "@napi-rs/canvas": "^0.1.65",
+    "@types/node": "^22.0.0",
+    "googleapis": "^174.0.1",
+    "jsdom": "^24.1.0",
+    "tsx": "^4.23.11",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "esbuild@0.28.1": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "Champions Teamsheet Generator",
+  "short_name": "Teamsheet",
+  "description": "Turn two Pokémon Champions screenshots into a Showdown paste and the official OTS / Staff team sheets.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e0a1e",
+  "theme_color": "#5b3fa6",
+  "icons": [
+    { "src": "./icons/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "./icons/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ]
+}
