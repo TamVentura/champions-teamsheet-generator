@@ -12,9 +12,6 @@ const DIVISION_INDEX: Record<Division, number> = {
   Master: 2,
 };
 
-/** Level is fixed at 50 in Champions. */
-const CHAMPIONS_LEVEL = 50;
-
 /**
  * Build one teamsheet.
  *
@@ -52,12 +49,8 @@ export function buildSheet(
   // ---- Shared block (drawn for BOTH sheets) ---------------------------------
   doc.setFontSize(7);
   doc.setFont('text2', 'normal');
-  let msg = 'All Pokémon must be listed exactly as they appear in the Battle Team,';
-  text(50, 272, msg);
-
-  doc.setFont('text1', 'normal');
-  msg = 'at the level they are in the game.';
-  text(120.5, 272, msg);
+  let msg = 'All Pokémon must be listed exactly as they appear in the Battle Team.';
+  text(105, 272, msg, 'center');
 
   doc.setFontSize(13);
   doc.setFont('text1', 'normal');
@@ -147,7 +140,6 @@ export function buildSheet(
 
     const pokeY = 67;
     const teraY = pokeY + 9.5;
-    const levelY = pokeY + 9.5;
     const abilityY = pokeY + 18;
     const itemY = pokeY + 26;
     const gapY = 70;
@@ -178,9 +170,11 @@ export function buildSheet(
     doc.setFont('customFont', 'normal');
     text(name, textX + (i % 2) * gapX, pokeY + Math.floor(i / 2) * gapY);
 
-    doc.setFontSize(13);
+    // "Stat Alignment" is wider than the other labels; shrink the font so it stays inside the
+    // cell's left strip (right-aligned to textXX) instead of spilling past the cell edge.
+    doc.setFontSize(8);
     doc.setFont('text1', 'normal');
-    text('Nature', textXX + (i % 2) * gapX, teraY + Math.floor(i / 2) * gapY, 'right');
+    text('Stat Alignment', textXX + (i % 2) * gapX, teraY + Math.floor(i / 2) * gapY, 'right');
     doc.setFontSize(11);
     doc.setFont('customFont', 'normal');
     text(teraType, textX + (i % 2) * gapX, teraY + Math.floor(i / 2) * gapY);
@@ -210,9 +204,6 @@ export function buildSheet(
 
     if (sheet === 'close') {
       const stats = getChampionsStats(name, evs, nature);
-      const level = CHAMPIONS_LEVEL;
-
-      text(level.toString(), statX + (i % 2) * (gapX - 1), levelY + Math.floor(i / 2) * gapY, 'right');
 
       let j = 0;
       for (const key of STAT_KEYS) {
@@ -283,7 +274,6 @@ export function buildSheet(
       doc.line(x + 80, y + 12, x + 80, y + 68);
       doc.setFontSize(6);
       doc.setFont('text1', 'normal');
-      text(x + 81, y + 14, 'Level');
       text(x + 81, y + 22, 'HP');
       text(x + 81, y + 30, 'Atk');
       text(x + 81, y + 38, 'Def');

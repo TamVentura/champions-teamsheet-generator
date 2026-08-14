@@ -13,11 +13,21 @@ import { google } from 'googleapis';
 import { readFileSync, createReadStream } from 'node:fs';
 
 const PKG = 'pt.tamventura.teamsheet';
-const TRACK = 'alpha'; // "Closed testing - Alpha"
+const TRACK = process.env.PLAY_TRACK || 'alpha'; // "Closed testing - Alpha"
 const KEY_PATH = process.env.PLAY_SA_KEY || 'C:/Users/tamve/.secrets/teamsheet-play-publisher.json';
 const AAB = process.argv[2] || 'android/app/build/outputs/bundle/release/app-release.aab';
-const NOTES = process.argv[3] ||
+// Version name shown in the release title. Passed by scripts/release.mjs; falls back to
+// whatever is declared in android/app/build.gradle so a manual run stays correct.
+const VERSION_NAME = process.env.PLAY_VERSION_NAME || readVersionName() || '1.1';
+const NOTES = process.argv[3] || process.env.PLAY_RELEASE_NOTES ||
   "What's new in 1.1:\n- New: paste a Pokemon Showdown / PokePaste team directly, as an alternative to reading the two screenshots.\n- Save, export and import your player profiles.\n- Clearer review screen that shows which screenshot each value came from.\n- Polish and fixes.";
+
+function readVersionName() {
+  try {
+    const gradle = readFileSync('android/app/build.gradle', 'utf8');
+    return gradle.match(/versionName\s+"([^"]+)"/)?.[1] || null;
+  } catch { return null; }
+}
 
 const auth = new google.auth.GoogleAuth({
   keyFile: KEY_PATH,
@@ -47,7 +57,7 @@ async function main() {
     requestBody: {
       track: TRACK,
       releases: [{
-        name: `${versionCode} (1.1)`,
+        name: `${versionCode} (${VERSION_NAME})`,
         versionCodes: [String(versionCode)],
         status: 'completed',
         releaseNotes: [{ language: 'en-US', text: NOTES }],
