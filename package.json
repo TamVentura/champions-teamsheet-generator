@@ -14,7 +14,8 @@
     "vendor": "node scripts/vendor-data.mjs",
     "cap:sync": "npm run build && cap sync android",
     "android:open": "cap open android",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",
@@ -40,5 +41,6 @@
   "allowScripts": {
     "esbuild@0.21.5": true,
     "esbuild@0.28.1": true
-  }
+  },
+  "packageManager": "pnpm@11.22.0"
 }

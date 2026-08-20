@@ -17,7 +17,7 @@ import {
   detectMovesGrid,
 } from './card';
 import { inferTeam, InferenceSignals, InferenceResult } from '../domain/speciesInference';
-import { isBaseForme } from '../domain/formes';
+import { isBaseForme, baseFormeName } from '../domain/formes';
 import { readTypeIcons } from './typeIcons';
 
 // Champions displays base species names, never the alternate-forme suffixes the vocab also
@@ -75,9 +75,30 @@ export interface FieldFlag {
   candidates?: string[];
 }
 
+/** Full-image fraction rects the reader actually cropped for one slot — so the review UI's
+ *  "Compare with screenshots" shows the EXACT regions OCR read, not a static-layout approximation
+ *  that drifts on phone aspect ratios different from the calibration reference. */
+export interface SlotCrops {
+  name: Rect;
+  ability: Rect;
+  item: Rect | null;
+  moves: Rect;
+  statsCard: Rect;
+}
+
 export interface ExtractResult {
   mons: ChampionsMon[];
   flags: FieldFlag[];
+  crops: SlotCrops[];
+}
+
+/** Bounding box of several rects (all in the same coordinate space). */
+function unionRect(rs: Rect[]): Rect {
+  const x0 = Math.min(...rs.map((r) => r.x));
+  const y0 = Math.min(...rs.map((r) => r.y));
+  const x1 = Math.max(...rs.map((r) => r.x + r.w));
+  const y1 = Math.max(...rs.map((r) => r.y + r.h));
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
 
@@ -197,7 +218,9 @@ export function resolveTeamSpecies(
       }
     } else {
       const name = names[slot];
-      if (name && name.confident && speciesBaseSet.has(name.value) && name.value !== result.species) {
+      // Champions prints the base name for regional formes, so compare against the inferred species'
+      // base name — otherwise a correct forme pick (name "Arcanine" vs "Arcanine-Hisui") would warn.
+      if (name && name.confident && speciesBaseSet.has(name.value) && name.value !== baseFormeName(result.species)) {
         flags.push({ slot, field: 'species', reason: 'name-mismatch' });
       }
     }
@@ -235,6 +258,7 @@ export async function extractTeam(
     finalStats: Record<StatKey, number | null>;
     evDigits: Record<StatKey, number | null>;
     types: { types: string[]; confident: boolean };
+    crops: SlotCrops;
   }
   const raws: CardRaw[] = new Array(total);
 
@@ -300,6 +324,15 @@ export async function extractTeam(
       finalStats: st.finalStats,
       evDigits: st.evDigits,
       types: typeRead,
+      // The exact regions this card was read from, as full-image fractions (card box ∘ field rect),
+      // so the review UI can show the true crops rather than a static-layout guess.
+      crops: {
+        name: within(movesCard, mv.name),
+        ability: within(movesCard, mv.ability),
+        item: mv.item ? within(movesCard, mv.item) : null,
+        moves: within(movesCard, unionRect(mv.moves)),
+        statsCard: statsCard,
+      },
     };
     onProgress?.(++done, total);
   }
@@ -349,5 +382,5 @@ export async function extractTeam(
     flags.push(...cardFlags);
   }
 
-  return { mons: monBySlot, flags };
+  return { mons: monBySlot, flags, crops: raws.map((r) => r.crops) };
 }

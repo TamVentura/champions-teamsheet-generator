@@ -3,7 +3,7 @@ import { speciesTypes } from '../data/species-types';
 import { speciesAbilities } from '../data/species-abilities';
 import { STAT_KEYS, StatKey } from './types';
 import { evFromFinalStat, getChampionsStats } from './champions';
-import { isBaseForme } from './formes';
+import { isBaseForme, isTransientForme, baseFormeName } from './formes';
 
 export interface InferenceSignals {
   ability: { value: string; confident: boolean } | null;
@@ -21,8 +21,29 @@ export interface InferenceResult {
   statScore: number;
 }
 
-// Candidate universe: base formes present in the stats table. Computed once.
-const BASE_SPECIES: string[] = Object.keys(pokedex).filter(isBaseForme);
+// Signature of a species' inferable identity: its base stats, types and abilities. Two formes with
+// identical signatures are indistinguishable by anything inference reads, so keeping both would only
+// spawn a meaningless picker — the cosmetic variant is dropped in favour of its base.
+function identitySig(name: string): string {
+  const st = pokedex[name];
+  const stats = st ? STAT_KEYS.map((k) => st[k]) : [];
+  const types = [...(speciesTypes[name] ?? [])].sort();
+  const abilities = [...(speciesAbilities[name] ?? [])].sort();
+  return JSON.stringify([stats, types, abilities]);
+}
+
+// Candidate universe (computed once). Base formes always qualify. Regional/rotational formes
+// (Alola/Galar/Hisui/Paldea/Therian/Origin/…) share the on-screen base name but are distinct
+// battle species — disambiguating them by stats/ability/type is exactly what inference is for — so
+// they're included when they actually differ from their base forme. Battle-transient formes
+// (Mega/Primal/Gmax) never appear as a chosen species on the team-preview and are excluded.
+const BASE_SPECIES: string[] = Object.keys(pokedex).filter((name) => {
+  if (isTransientForme(name)) return false;
+  if (isBaseForme(name)) return true;
+  const parent = baseFormeName(name);
+  // Keep the forme when its base isn't a species of its own, or when it reads differently from it.
+  return !pokedex[parent] || identitySig(name) !== identitySig(parent);
+});
 
 // Decision margins (see design §"Decision"). A winner is confident when it is clearly ahead:
 // at least SCORE_GAP stat-points, or — on a score tie — RESIDUAL_GAP closer in summed residual.

@@ -85,6 +85,52 @@ describe('inferSpecies', () => {
     expect(r.species).toBe('Typhlosion');
     expect(r.confident).toBe(true);
   });
+
+  // Regional formes share the base name on-screen but have distinct stats/types/abilities — the
+  // exact case inference exists to resolve. They MUST be in the candidate pool.
+  it('resolves a regional forme (Hisuian Arcanine) — its stats/ability point to it, not any base forme', () => {
+    // Hisuian Arcanine: Fire/Rock, Rock Head — a real Champions build (Head Smash off Rock Head).
+    const r = inferSpecies(base({
+      ability: { value: 'Rock Head', confident: true },
+      types: { value: ['Fire', 'Rock'], confident: true },
+      finalStats: finalStatsFor('Arcanine-Hisui'),
+    }));
+    expect(r.species).toBe('Arcanine-Hisui');
+    expect(r.confident).toBe(true);
+  });
+
+  it('resolves a regional forme on stats alone (ability read, type not read)', () => {
+    const r = inferSpecies(base({
+      ability: { value: 'Rock Head', confident: true },
+      types: null,
+      finalStats: finalStatsFor('Arcanine-Hisui'),
+    }));
+    expect(r.species).toBe('Arcanine-Hisui');
+    expect(r.confident).toBe(true);
+  });
+
+  it('distinguishes a forme from its base by stats when they share an ability', () => {
+    // Both regular and Hisuian Arcanine have Intimidate; only the stats tell them apart.
+    const kanto = inferSpecies(base({
+      ability: { value: 'Intimidate', confident: true },
+      finalStats: finalStatsFor('Arcanine'),
+    }));
+    expect(kanto.species).toBe('Arcanine');
+
+    const hisui = inferSpecies(base({
+      ability: { value: 'Intimidate', confident: true },
+      finalStats: finalStatsFor('Arcanine-Hisui'),
+    }));
+    expect(hisui.species).toBe('Arcanine-Hisui');
+  });
+
+  it('battle-transient formes (Mega/Gmax/Primal) are never candidates', () => {
+    // Charizard-Mega-Y's own stats must not resolve to the mega — megas are item-driven and the
+    // team-preview shows pre-mega stats, so the mega forme must be out of the pool entirely.
+    const r = inferSpecies(base({ finalStats: finalStatsFor('Charizard-Mega-Y') }));
+    expect(r.candidates).not.toContain('Charizard-Mega-Y');
+    expect(r.species).not.toBe('Charizard-Mega-Y');
+  });
 });
 
 describe('inferTeam (sequential Species Clause)', () => {

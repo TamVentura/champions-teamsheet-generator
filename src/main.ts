@@ -12,7 +12,7 @@ import {
 import { arrowsFromNature, validateSpread } from './domain/champions';
 import { toShowdownPaste, parseShowdownPaste } from './domain/showdown';
 import { vocab } from './data/vocab';
-import { extractTeam, FieldFlag } from './ocr/extract';
+import { extractTeam, FieldFlag, SlotCrops } from './ocr/extract';
 import { browserScreen, cropDataUrl, imageToCanvas, loadImageFile } from './ocr/browser';
 import { classifyScreen } from './ocr/classify';
 import { CARDS, movesFields, statsFields, within } from './ocr/layout';
@@ -239,6 +239,8 @@ interface State {
   movesCanvas: HTMLCanvasElement | null;
   mons: ChampionsMon[];
   flags: FieldFlag[];
+  /** Exact crop rects (full-image fractions) the reader used, for the review "Compare" view. */
+  crops: SlotCrops[] | null;
   progress: string;
 }
 
@@ -254,6 +256,7 @@ const state: State = {
   movesCanvas: null,
   mons: [],
   flags: [],
+  crops: null,
   progress: '',
 };
 
@@ -701,6 +704,7 @@ function runPaste(): void {
   state.source = 'paste';
   state.statsCanvas = null;
   state.movesCanvas = null;
+  state.crops = null;
   goForward('review');
 }
 
@@ -711,6 +715,7 @@ function runManual(): void {
   state.source = 'manual';
   state.statsCanvas = null;
   state.movesCanvas = null;
+  state.crops = null;
   goForward('review');
 }
 
@@ -747,6 +752,7 @@ async function runExtraction() {
     );
     state.mons = result.mons;
     state.flags = result.flags;
+    state.crops = result.crops;
     // Guard against the user hitting Back while OCR was running.
     if (state.view === 'processing') goForward('review');
     return;
@@ -885,11 +891,14 @@ function renderMonCard(mon: ChampionsMon, slot: number): HTMLElement {
   compareBtn.addEventListener('click', () => {
     if (cropsRow.childElementCount) { cropsRow.replaceChildren(); return; }
     if (!state.movesCanvas || !state.statsCanvas) return;
-    const nameCrop = cropDataUrl(state.movesCanvas, within(CARDS[slot], movesFields.name));
-    const abilityCrop = cropDataUrl(state.movesCanvas, within(CARDS[slot], movesFields.ability));
-    const itemCrop = cropDataUrl(state.movesCanvas, within(CARDS[slot], movesFields.item));
-    const movesCrop = cropDataUrl(state.movesCanvas, within(CARDS[slot], movesFields.movesBlock));
-    const statsCrop = cropDataUrl(state.statsCanvas, CARDS[slot]);
+    // Prefer the EXACT regions the reader cropped (content-adaptive, so they track the real card
+    // positions on any phone). Fall back to the static reference layout only if geometry is absent.
+    const c = state.crops?.[slot];
+    const nameCrop = cropDataUrl(state.movesCanvas, c ? c.name : within(CARDS[slot], movesFields.name));
+    const abilityCrop = cropDataUrl(state.movesCanvas, c ? c.ability : within(CARDS[slot], movesFields.ability));
+    const itemCrop = cropDataUrl(state.movesCanvas, c ? c.item ?? within(CARDS[slot], movesFields.item) : within(CARDS[slot], movesFields.item));
+    const movesCrop = cropDataUrl(state.movesCanvas, c ? c.moves : within(CARDS[slot], movesFields.movesBlock));
+    const statsCrop = cropDataUrl(state.statsCanvas, c ? c.statsCard : CARDS[slot]);
     for (const [lbl, src] of [['name', nameCrop], ['ability', abilityCrop], ['item', itemCrop], ['moves', movesCrop], ['stats', statsCrop]] as const) {
       cropsRow.appendChild(el(`<div style="text-align:center"><div class="muted">${lbl}</div><img src="${src}" style="max-width:220px;border:1px solid var(--border);border-radius:4px"></div>`));
     }
