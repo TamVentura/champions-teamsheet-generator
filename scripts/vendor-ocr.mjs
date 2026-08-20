@@ -34,6 +34,15 @@ function pkgDir(pkg) {
   return dirname(require.resolve(`${pkg}/package.json`));
 }
 
+// Resolve a package via ANOTHER package's require context. pnpm's strict node_modules only exposes
+// a package's own declared deps, so a transitive dep like `tesseract.js-core` (a dep of
+// `tesseract.js`, not of this repo) isn't resolvable from the root — but it IS from tesseract.js's
+// own dir. On npm's flat layout this simply falls through to the same place.
+function pkgDirFrom(fromPkg, pkg) {
+  const req = createRequire(require.resolve(`${fromPkg}/package.json`));
+  return dirname(req.resolve(`${pkg}/package.json`));
+}
+
 // Fresh output dir.
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
@@ -46,7 +55,7 @@ copyFileSync(workerSrc, join(outDir, 'worker.min.js'));
 //    tesseract-core-simd-lstm.wasm.js (modern WebView with WASM SIMD) or tesseract-core-lstm.wasm.js
 //    (older WebView, e.g. Android 8) — plus their .wasm. The non-LSTM cores and the asm.js
 //    fallbacks are dead weight (~16 MB) and are intentionally not bundled.
-const coreDir = pkgDir('tesseract.js-core');
+const coreDir = pkgDirFrom('tesseract.js', 'tesseract.js-core');
 const coreFiles = [
   'tesseract-core-lstm.wasm.js',
   'tesseract-core-lstm.wasm',

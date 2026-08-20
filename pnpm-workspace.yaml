@@ -1,0 +1,8 @@
+# pnpm 11 reads settings from here (no longer the "pnpm" field in package.json).
+# Allow the install scripts the build actually needs — esbuild (vite build), plus
+# sharp / tesseract.js / core-js — otherwise pnpm blocks them and `pnpm install` exits 1.
+allowBuilds:
+  core-js: true
+  esbuild: true
+  sharp: true
+  tesseract.js: true
