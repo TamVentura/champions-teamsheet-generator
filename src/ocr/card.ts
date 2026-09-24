@@ -510,9 +510,36 @@ export function analyzeMovesCard(reg: RegionData, grid: MovesGrid): MovesResult 
     const h = b.y1 - b.y0;
     return { y0: Math.max(0, Math.round(b.y0 - h * up)), y1: Math.min(H - 1, Math.round(b.y1 + h * down)) };
   };
+  // The ability/item bands come from rows whose ink passes a fraction of the COLUMN width, so the
+  // sparse top of capitals/ascenders (and descender tails) of a short word — "Trace", "Drizzle" —
+  // falls below it, and the team-wide median inherits the clip. A glyph cut through its top reads
+  // as junk ("Adaptability" -> "AddDTlaDUITY"). Re-grow each card's band over the text's own
+  // columns while any ink remains (bounded, so it can't climb into the header or the next row),
+  // then add a small proportional margin.
+  const growBand = (b: { y0: number; y1: number }, x0: number, x1: number) => {
+    const h = b.y1 - b.y0 + 1;
+    const limit = Math.round(h * 0.8);
+    const rowHasInk = (y: number) => {
+      let c = 0;
+      for (let x = x0; x <= x1; x++) if (bin.data[(y * W + x) * 4] < 128 && ++c >= 2) return true;
+      return false;
+    };
+    let y0 = b.y0;
+    while (y0 > 0 && b.y0 - y0 < limit && rowHasInk(y0 - 1)) y0--;
+    let y1 = b.y1;
+    while (y1 < H - 1 && y1 - b.y1 < limit && rowHasInk(y1 + 1)) y1++;
+    const m = Math.max(2, Math.round(h * 0.1));
+    return { y0: Math.max(0, y0 - m), y1: Math.min(H - 1, y1 + m) };
+  };
+  const boundGrown = (x0: number, x1: number, b: { y0: number; y1: number }, minSkip = 0): Rect => {
+    const tight = bound(x0, x1, b, minSkip);
+    const tx0 = Math.round(tight.x * W);
+    const tx1 = Math.min(W - 1, Math.round((tight.x + tight.w) * W));
+    return bound(x0, x1, growBand(b, tx0, tx1), minSkip);
+  };
   const nameRect = bound(0, gpx, padBand(px(grid.header), 0.15, 0.35));
-  const abilityRect = bound(0, gpx, px(grid.ability));
-  const itemRect = grid.item ? bound(0, gpx, px(grid.item), iconSkip(px(grid.item))) : null;
+  const abilityRect = boundGrown(0, gpx, px(grid.ability));
+  const itemRect = grid.item ? boundGrown(0, gpx, px(grid.item), iconSkip(px(grid.item))) : null;
   const moves: Rect[] = grid.moves.map((m) => bound(gpx, W - 1, px(m), iconSkip(px(m))));
   debug.name = nameRect;
   debug.ability = abilityRect;

@@ -19,6 +19,7 @@ import {
 import { inferTeam, InferenceSignals, InferenceResult } from '../domain/speciesInference';
 import { isBaseForme, baseFormeName } from '../domain/formes';
 import { readTypeIcons } from './typeIcons';
+import { speciesAbilities } from '../data/species-abilities';
 
 // Champions displays base species names, never the alternate-forme suffixes the vocab also
 // contains. Matching a base name against those forms lets OCR junk snap to e.g. "Kangaskhan-Mega",
@@ -101,8 +102,11 @@ function unionRect(rs: Rect[]): Rect {
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
-
-function detectGender(region: RegionData): 'M' | 'F' | null {
+/** Gender from the header's ♂/♀ icon. The icons are near-PURE primaries — ♂ ≈ (0,60,234) blue,
+ *  ♀ ≈ (228,0,1) red — while the type icons sharing the strip keep the other channels well up
+ *  (Water ≈ (25,105,190), Fire ≈ (211,39,39), Psychic ≈ (198,55,99)). A loose "blue-ish" /
+ *  "pink-ish" test counted the Water icon as ♂ and never matched the red ♀, so every mon read ♂. */
+export function detectGender(region: RegionData): 'M' | 'F' | null {
   const { data, width, height } = region;
   let male = 0;
   let female = 0;
@@ -111,8 +115,8 @@ function detectGender(region: RegionData): 'M' | 'F' | null {
     const r = data[o];
     const g = data[o + 1];
     const b = data[o + 2];
-    if (b > 150 && b - r > 30 && b - g > 20) male++; // ♂ blue
-    else if (r > 150 && r - g > 40 && b - g > 20) female++; // ♀ pink/magenta
+    if (b > 150 && r < 50 && g < 80) male++; // ♂ pure blue (Water icon is ~(25,105,190))
+    else if (r > 130 && g < 30 && b < 50) female++; // ♀ pure red (Fire icon keeps g ≥ ~40)
   }
   const min = Math.max(20, width * height * 0.01);
   if (male < min && female < min) return null;
@@ -367,7 +371,13 @@ export async function extractTeam(
     if (!r.spread.ok) cardFlags.push({ slot, field: 'evs', reason: 'bad-spread' });
     for (const key of r.spread.overCap) cardFlags.push({ slot, field: `ev.${key}`, reason: 'low-confidence' });
     for (const key of r.lowConf) cardFlags.push({ slot, field: `ev.${key}`, reason: 'low-confidence' });
-    if (!r.ability.confident) cardFlags.push({ slot, field: 'ability', reason: 'no-match' });
+    // A species has at most ~3 abilities. When the species itself was resolved without doubt, an
+    // ability read that snapped to one of THAT species' abilities is corroborated by an independent
+    // signal, so a middling OCR distance alone no longer warrants a flag.
+    const species = result.species || r.nameSnap.value;
+    const legal = speciesAbilities[species] ?? speciesAbilities[baseFormeName(species)] ?? [];
+    const abilityCorroborated = speciesFlags.length === 0 && legal.includes(r.ability.value);
+    if (!r.ability.confident && !abilityCorroborated) cardFlags.push({ slot, field: 'ability', reason: 'no-match' });
     if (r.item && !r.item.confident) cardFlags.push({ slot, field: 'item', reason: 'no-match' });
 
     monBySlot[slot] = {

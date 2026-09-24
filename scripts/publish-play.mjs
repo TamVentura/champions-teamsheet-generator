@@ -19,8 +19,10 @@ const AAB = process.argv[2] || 'android/app/build/outputs/bundle/release/app-rel
 // Version name shown in the release title. Passed by scripts/release.mjs; falls back to
 // whatever is declared in android/app/build.gradle so a manual run stays correct.
 const VERSION_NAME = process.env.PLAY_VERSION_NAME || readVersionName() || '1.1';
-const NOTES = process.argv[3] || process.env.PLAY_RELEASE_NOTES ||
-  "What's new in 1.1:\n- New: paste a Pokemon Showdown / PokePaste team directly, as an alternative to reading the two screenshots.\n- Save, export and import your player profiles.\n- Clearer review screen that shows which screenshot each value came from.\n- Polish and fixes.";
+// Shells often pass "\n" through literally (env var / argv) — turn it into a real newline,
+// otherwise the store shows the backslash-n verbatim in "What's new".
+const NOTES = (process.argv[3] || process.env.PLAY_RELEASE_NOTES ||
+  "What's new in 1.1:\n- New: paste a Pokemon Showdown / PokePaste team directly, as an alternative to reading the two screenshots.\n- Save, export and import your player profiles.\n- Clearer review screen that shows which screenshot each value came from.\n- Polish and fixes.").replace(/\\n/g, '\n');
 
 function readVersionName() {
   try {
