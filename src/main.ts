@@ -16,7 +16,7 @@ import { extractTeam, FieldFlag, SlotCrops } from './ocr/extract';
 import { browserScreen, cropDataUrl, imageToCanvas, loadImageFile } from './ocr/browser';
 import { classifyScreen } from './ocr/classify';
 import { CARDS, movesFields, statsFields, within } from './ocr/layout';
-import { buildBoth, savePdfs } from './pdf/generate';
+import { buildTeamsheet, type SheetPages } from './pdf/generate';
 import {
   activeProfile,
   emptyProfile,
@@ -28,7 +28,6 @@ import {
   saveStore,
 } from './persist';
 import { registerServiceWorker } from './pwa';
-import type { jsPDF } from 'jspdf';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -47,9 +46,24 @@ if (isNative) {
   });
 }
 
-/** Reliably trigger a download of a jsPDF doc via its own anchor + blob URL. */
-function downloadDoc(doc: { output: (t: 'blob') => Blob }, filename: string): void {
-  const url = URL.createObjectURL(doc.output('blob'));
+/** A generated PDF ready to save/share/print. */
+interface PdfFile {
+  bytes: Uint8Array;
+  filename: string;
+}
+
+const pdfBlob = (bytes: Uint8Array) => new Blob([bytes as BlobPart], { type: 'application/pdf' });
+
+/** Base64 of raw bytes (chunked — spreading a large array into String.fromCharCode overflows). */
+function toBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+/** Reliably trigger a download of a PDF via its own anchor + blob URL. */
+function downloadDoc({ bytes, filename }: PdfFile): void {
+  const url = URL.createObjectURL(pdfBlob(bytes));
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
@@ -66,12 +80,11 @@ function downloadDoc(doc: { output: (t: 'blob') => Blob }, filename: string): vo
  * dialog, so the browser flow below dead-ends ("nothing opens"). Instead we write the PDF into
  * the app cache and hand it to the OS via the share sheet, which offers a PDF viewer / Print.
  */
-async function sharePdfsNative(items: { doc: jsPDF; filename: string }[]): Promise<void> {
+async function sharePdfsNative(items: PdfFile[]): Promise<void> {
   try {
     const files: string[] = [];
-    for (const { doc, filename } of items) {
-      const base64 = (doc.output('datauristring') as string).split('base64,')[1];
-      const res = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
+    for (const { bytes, filename } of items) {
+      const res = await Filesystem.writeFile({ path: filename, data: toBase64(bytes), directory: Directory.Cache });
       files.push(res.uri);
     }
     await Share.share({ title: 'Team sheet', files });
@@ -88,12 +101,11 @@ async function sharePdfsNative(items: { doc: jsPDF; filename: string }[]): Promi
  * Native (Android): actually SAVE the PDFs to the device's public Documents folder (visible in
  * Files), as opposed to the share sheet. Reports where they landed.
  */
-async function savePdfsNative(items: { doc: jsPDF; filename: string }[]): Promise<void> {
+async function savePdfsNative(items: PdfFile[]): Promise<void> {
   try {
     const saved: string[] = [];
-    for (const { doc, filename } of items) {
-      const base64 = (doc.output('datauristring') as string).split('base64,')[1];
-      await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Documents });
+    for (const { bytes, filename } of items) {
+      await Filesystem.writeFile({ path: filename, data: toBase64(bytes), directory: Directory.Documents });
       saved.push(filename);
     }
     showModal({
@@ -181,17 +193,12 @@ async function saveJsonNative(json: string, filename: string): Promise<void> {
 }
 
 /**
- * Print a jsPDF doc. In the browser/PWA: a hidden iframe + the autoPrint OpenAction raises the
- * print dialog in-app (the manifest is `display: standalone`, so `window.open` opens nothing).
- * In the native app: fall back to the OS share/print sheet (see sharePdfsNative).
+ * Print a PDF (built with `autoPrint`). In the browser/PWA: a hidden iframe + the document's
+ * print-on-open action raises the print dialog in-app (the manifest is `display: standalone`, so
+ * `window.open` opens nothing). The native app uses the OS share/print sheet instead.
  */
-function printPdf(doc: jsPDF, filename = 'teamsheet.pdf'): void {
-  if (isNative) {
-    void sharePdfsNative([{ doc, filename }]);
-    return;
-  }
-  doc.autoPrint();
-  const url = doc.output('bloburl') as unknown as string;
+function printPdf({ bytes }: PdfFile): void {
+  const url = URL.createObjectURL(pdfBlob(bytes));
   let frame = document.getElementById('print-frame') as HTMLIFrameElement | null;
   if (!frame) {
     frame = document.createElement('iframe');
@@ -940,14 +947,20 @@ function renderOutput() {
   const team = { profile, mons: state.mons };
   const paste = toShowdownPaste(team);
   const id = profile.playerId.trim() || 'teamsheet';
-  // Fresh docs per action (cheap enough, avoids reusing a consumed jsPDF).
-  const sheets = () => {
-    const { open, staff } = savePdfs(profile, state.teamName, state.mons);
-    return {
-      staff: { doc: staff, filename: `${id}-staff.pdf` },
-      open: { doc: open, filename: `${id}-OTS.pdf` },
-    };
-  };
+  const names: Record<SheetPages, string> = { staff: `${id}-staff.pdf`, open: `${id}-OTS.pdf`, both: `${id}-teamsheet.pdf` };
+  const make = async (pages: SheetPages, autoPrint = false): Promise<PdfFile> => ({
+    bytes: await buildTeamsheet(profile, state.teamName, state.mons, pages, { autoPrint }),
+    filename: names[pages],
+  });
+  // Every button builds fresh PDFs; a failure (e.g. template not loaded offline) gets a modal.
+  const run = (task: () => Promise<void>) => () =>
+    void task().catch((err) =>
+      showModal({
+        title: 'Could not build the PDF',
+        message: err instanceof Error ? err.message : String(err),
+        buttons: [{ label: 'OK', kind: 'primary', onClick: () => {} }],
+      })
+    );
 
   const shareVerb = isNative ? 'Share / print' : 'Print';
   const wrap = el(`<div>
@@ -973,31 +986,27 @@ function renderOutput() {
   </div>`);
 
   // Share / print — both sheets.
-  wrap.querySelector('#shBoth')!.addEventListener('click', () => {
-    const { staff, open } = sheets();
-    if (isNative) void sharePdfsNative([staff, open]);
-    else printPdf(buildBoth(profile, state.teamName, state.mons), `${id}-teamsheet.pdf`);
-  });
+  wrap.querySelector('#shBoth')!.addEventListener('click', run(async () => {
+    if (isNative) await sharePdfsNative([await make('staff'), await make('open')]);
+    else printPdf(await make('both', true));
+  }));
   // Share / print — a single sheet (so one can go to WhatsApp, the other to email).
-  wrap.querySelector('#shStaff')!.addEventListener('click', () => {
-    const { staff } = sheets();
-    if (isNative) void sharePdfsNative([staff]);
-    else printPdf(staff.doc, staff.filename);
-  });
-  wrap.querySelector('#shOpen')!.addEventListener('click', () => {
-    const { open } = sheets();
-    if (isNative) void sharePdfsNative([open]);
-    else printPdf(open.doc, open.filename);
-  });
+  for (const [sel, pages] of [['#shStaff', 'staff'], ['#shOpen', 'open']] as const) {
+    wrap.querySelector(sel)!.addEventListener('click', run(async () => {
+      if (isNative) await sharePdfsNative([await make(pages)]);
+      else printPdf(await make(pages, true));
+    }));
+  }
   // Download both — save real files (device Documents on native; browser download on web).
-  wrap.querySelector('#dlBoth')!.addEventListener('click', () => {
-    const { staff, open } = sheets();
-    if (isNative) void savePdfsNative([staff, open]);
+  wrap.querySelector('#dlBoth')!.addEventListener('click', run(async () => {
+    const staff = await make('staff');
+    const open = await make('open');
+    if (isNative) await savePdfsNative([staff, open]);
     else {
-      downloadDoc(staff.doc, staff.filename);
-      setTimeout(() => downloadDoc(open.doc, open.filename), 900);
+      downloadDoc(staff);
+      setTimeout(() => downloadDoc(open), 900);
     }
-  });
+  }));
   wrap.querySelector('#copy')!.addEventListener('click', async () => {
     await navigator.clipboard.writeText(paste);
     (wrap.querySelector('#copy') as HTMLElement).textContent = 'Copied ✓';
