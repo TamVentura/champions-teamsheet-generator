@@ -8,6 +8,7 @@ const profile: PlayerProfile = {
   switchProfileName: '',
   playerId: 'a2',
   dateOfBirth: '',
+  supportId: '',
   division: 'Master',
 };
 

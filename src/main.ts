@@ -336,8 +336,8 @@ function applyView(view: View): void {
 
 /** The identity fields that count towards "unsaved changes" (id excluded). */
 function idFields(p: PlayerProfile): string {
-  const { playerName, trainerNameInGame, switchProfileName, playerId, dateOfBirth, division } = p;
-  return JSON.stringify({ playerName, trainerNameInGame, switchProfileName, playerId, dateOfBirth, division });
+  const { playerName, trainerNameInGame, switchProfileName, playerId, supportId, dateOfBirth, division } = p;
+  return JSON.stringify({ playerName, trainerNameInGame, switchProfileName, playerId, supportId, dateOfBirth, division });
 }
 
 function isEditorDirty(): boolean {
@@ -404,6 +404,7 @@ function profileSummary(p: StoredProfile): string {
     ['Switch Profile Name', p.switchProfileName],
     ['Player ID', p.playerId],
     ['Date of Birth', p.dateOfBirth],
+    ['Support ID', p.supportId],
     ['Age Division', p.division],
   ];
   return `<div class="grid2" style="margin-top:12px">${rows
@@ -648,6 +649,7 @@ function renderProfileEditor() {
         ${field('switchProfileName', 'Switch Profile Name')}
         ${field('playerId', 'Player ID')}
         ${field('dateOfBirth', 'Date of Birth', 'DD/MM/YYYY')}
+        ${field('supportId', 'Support ID')}
         <div><label>Age Division</label><select data-p="division" ${ro ? 'disabled' : ''}>
           ${(['Junior', 'Senior', 'Master'] as Division[]).map((x) => `<option ${d.division === x ? 'selected' : ''}>${x}</option>`).join('')}
         </select></div>

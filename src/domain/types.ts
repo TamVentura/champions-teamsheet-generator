@@ -31,6 +31,8 @@ export interface PlayerProfile {
   trainerNameInGame: string;
   switchProfileName: string;
   playerId: string;
+  /** Support ID (staff page, under Date of Birth) — added to the official template in 2026. */
+  supportId: string;
   dateOfBirth: string;
   division: Division;
 }

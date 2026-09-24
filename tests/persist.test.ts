@@ -9,6 +9,7 @@ const mk = (id: string, name: string): StoredProfile => ({
   switchProfileName: name,
   playerId: '1234-5678',
   dateOfBirth: '01/01/2000',
+  supportId: '',
   division: 'Master',
 });
 

@@ -10,6 +10,7 @@ export function emptyProfile(): PlayerProfile {
     trainerNameInGame: '',
     switchProfileName: '',
     playerId: '',
+    supportId: '',
     dateOfBirth: '',
     division: 'Master',
   };
@@ -52,7 +53,9 @@ export function loadStore(): ProfileStore {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as ProfileStore;
-      const profiles = Array.isArray(parsed.profiles) ? parsed.profiles : [];
+      // Spread over a blank profile so profiles saved before a field existed (e.g. supportId)
+      // come back with it defined.
+      const profiles = (Array.isArray(parsed.profiles) ? parsed.profiles : []).map((p) => ({ ...emptyProfile(), ...p }));
       const activeId = profiles.some((p) => p.id === parsed.activeId)
         ? parsed.activeId
         : profiles[0]?.id ?? null;
@@ -91,8 +94,8 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 /** Identity fields (id excluded) used to skip re-importing a profile that already exists. */
 function profileIdentity(p: StoredProfile): string {
-  const { playerName, trainerNameInGame, switchProfileName, playerId, dateOfBirth, division } = p;
-  return JSON.stringify({ playerName, trainerNameInGame, switchProfileName, playerId, dateOfBirth, division });
+  const { playerName, trainerNameInGame, switchProfileName, playerId, supportId, dateOfBirth, division } = p;
+  return JSON.stringify({ playerName, trainerNameInGame, switchProfileName, playerId, supportId, dateOfBirth, division });
 }
 
 /** Coerce an untrusted object from an imported file into a valid StoredProfile (or null). */
@@ -108,6 +111,7 @@ function sanitizeProfile(raw: any): StoredProfile | null {
     trainerNameInGame: str(raw.trainerNameInGame),
     switchProfileName: str(raw.switchProfileName),
     playerId: str(raw.playerId),
+    supportId: str(raw.supportId),
     dateOfBirth: str(raw.dateOfBirth),
     division,
   };
