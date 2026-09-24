@@ -193,21 +193,31 @@ async function saveJsonNative(json: string, filename: string): Promise<void> {
 }
 
 /**
- * Print a PDF (built with `autoPrint`). In the browser/PWA: a hidden iframe + the document's
- * print-on-open action raises the print dialog in-app (the manifest is `display: standalone`, so
- * `window.open` opens nothing). The native app uses the OS share/print sheet instead.
+ * Print a PDF in the browser/PWA: load it into an off-screen iframe and call print() on that
+ * frame once the PDF viewer has loaded (a same-origin blob URL, so the call is allowed). Relying
+ * on a print action embedded in the PDF doesn't work — Chrome's viewer ignores document scripts —
+ * and `visibility:hidden` can stop the viewer loading at all. If printing the frame fails, open
+ * the PDF in a tab so it can be printed from there. The native app uses the OS share/print sheet.
  */
 function printPdf({ bytes }: PdfFile): void {
   const url = URL.createObjectURL(pdfBlob(bytes));
-  let frame = document.getElementById('print-frame') as HTMLIFrameElement | null;
-  if (!frame) {
-    frame = document.createElement('iframe');
-    frame.id = 'print-frame';
-    frame.style.cssText =
-      'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;visibility:hidden';
-    document.body.appendChild(frame);
-  }
+  document.getElementById('print-frame')?.remove(); // a fresh frame per print, so onload fires
+  const frame = document.createElement('iframe');
+  frame.id = 'print-frame';
+  frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:600px;border:0';
+  frame.onload = () => {
+    // The PDF viewer finishes initialising just after load; give it a beat before printing.
+    setTimeout(() => {
+      try {
+        frame.contentWindow!.focus();
+        frame.contentWindow!.print();
+      } catch {
+        window.open(url, '_blank');
+      }
+    }, 300);
+  };
   frame.src = url;
+  document.body.appendChild(frame);
 }
 
 /** Human-readable nature effect, e.g. "+Atk, −SpA" or "neutral". */
@@ -948,8 +958,8 @@ function renderOutput() {
   const paste = toShowdownPaste(team);
   const id = profile.playerId.trim() || 'teamsheet';
   const names: Record<SheetPages, string> = { staff: `${id}-staff.pdf`, open: `${id}-OTS.pdf`, both: `${id}-teamsheet.pdf` };
-  const make = async (pages: SheetPages, autoPrint = false): Promise<PdfFile> => ({
-    bytes: await buildTeamsheet(profile, state.teamName, state.mons, pages, { autoPrint }),
+  const make = async (pages: SheetPages): Promise<PdfFile> => ({
+    bytes: await buildTeamsheet(profile, state.teamName, state.mons, pages),
     filename: names[pages],
   });
   // Every button builds fresh PDFs; a failure (e.g. template not loaded offline) gets a modal.
@@ -987,14 +997,16 @@ function renderOutput() {
 
   // Share / print — both sheets.
   wrap.querySelector('#shBoth')!.addEventListener('click', run(async () => {
-    if (isNative) await sharePdfsNative([await make('staff'), await make('open')]);
-    else printPdf(await make('both', true));
+    // One PDF, two pages: page 1 = staff sheet, page 2 = opponents sheet.
+    const both = await make('both');
+    if (isNative) await sharePdfsNative([both]);
+    else printPdf(both);
   }));
   // Share / print — a single sheet (so one can go to WhatsApp, the other to email).
   for (const [sel, pages] of [['#shStaff', 'staff'], ['#shOpen', 'open']] as const) {
     wrap.querySelector(sel)!.addEventListener('click', run(async () => {
       if (isNative) await sharePdfsNative([await make(pages)]);
-      else printPdf(await make(pages, true));
+      else printPdf(await make(pages));
     }));
   }
   // Download both — save real files (device Documents on native; browser download on web).

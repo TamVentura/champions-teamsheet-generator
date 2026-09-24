@@ -11,15 +11,14 @@ export async function buildTeamsheet(
   profile: PlayerProfile,
   teamName: string,
   mons: ChampionsMon[],
-  pages: SheetPages = 'both',
-  opts: { autoPrint?: boolean } = {}
+  pages: SheetPages = 'both'
 ): Promise<Uint8Array> {
   templateBytes ??= fetch(templateUrl).then((r) => {
     if (!r.ok) throw new Error(`Could not load the team list template (${r.status})`);
     return r.arrayBuffer();
   });
   try {
-    return await fillTeamsheet(await templateBytes, profile, teamName, mons, pages, opts);
+    return await fillTeamsheet(await templateBytes, profile, teamName, mons, pages);
   } catch (err) {
     templateBytes = null; // let a retry re-fetch
     throw err;

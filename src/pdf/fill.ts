@@ -41,15 +41,14 @@ function put(field: PDFTextField, font: PDFFont, value: string, size: number): v
 
 /**
  * Fill the form template with a player's details and team. Pure (no I/O) so it runs in Node tests
- * as well as the browser. `autoPrint` embeds a document-open print action for the in-app Print flow.
+ * as well as the browser.
  */
 export async function fillTeamsheet(
   template: Uint8Array | ArrayBuffer,
   profile: PlayerProfile,
   teamName: string,
   mons: ChampionsMon[],
-  pages: SheetPages = 'both',
-  opts: { autoPrint?: boolean } = {}
+  pages: SheetPages = 'both'
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.load(template);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -86,6 +85,5 @@ export async function fillTeamsheet(
   form.flatten();
   if (pages === 'staff') pdf.removePage(1);
   if (pages === 'open') pdf.removePage(0);
-  if (opts.autoPrint) pdf.addJavaScript('print', 'this.print({bUI: true, bSilent: false, bShrinkToFit: true});');
   return pdf.save();
 }
